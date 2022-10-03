@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import datetime
 import json
 import re
 import requests
@@ -39,6 +40,10 @@ def parse_args():
             help="List of change IDs")
     parser.add_argument("-i", "--change-ids-file", type=str,
             help="Input file include a list of change IDs")
+    parser.add_argument("--input-json", type=str,
+            help="Path of JSON formatted results, for debugging.")
+    parser.add_argument("-t", "--term", type=str,
+            help="Term for querying (in hours, such as '24*2' for two days).")
     return parser.parse_args()
 
 
@@ -101,7 +106,7 @@ def html(json_obj):
     print(html)
 
 
-def output(json_obj, format="json"):
+def output(json_obj, format="html"):
     if format == "html":
         html(json_obj)
     else:
@@ -121,32 +126,47 @@ def main():
             for l in f.readlines():
                 if not l.startswith("#"):
                     ch_ids.append(l.rstrip())
-
     ch_ids = list(set(ch_ids))
 
-    ptn = re.compile(r'^- (.*) (.*) : {} in (.*)$'.format(TARGET_STATUS))
-
     zuul_results = []
-    for chid in ch_ids:
-        msg_objs = change_messages(chid)
-        for obj in msg_objs:
-            for m in obj["message"].split("\n"):
-                matched = ptn.match(m)
-                if matched is not None:
-                    zr = {"name": matched.group(1), "url": matched.group(2),
-                            "time": matched.group(3).replace(" (non-voting)",
-                                "")}
-                    zuul_results.append(zr)
+    if args.input_json is not None:
+        zuul_results = json.load(open(args.input_json))
+    else:
+        ptn = re.compile(r'^- (.*) (.*) : {} in (.*)$'.format(TARGET_STATUS))
 
-    for zr in zuul_results:
-        uuid = zr["url"].split("/")[-1]
-        req_zuul = "{}/api/tenant/openstack/builds?uuid={}".format(
-            ZUUL_BASE, uuid)
+        for chid in ch_ids:
+            msg_objs = change_messages(chid)
+            for obj in msg_objs:
+                for m in obj["message"].split("\n"):
+                    matched = ptn.match(m)
+                    if matched is not None:
+                        name = matched.group(1)
+                        url = matched.group(2)
+                        time = matched.group(3).replace(" (non-voting)", "")
+                        zr = {"name": name, "url": url, "time": time}
+                        zuul_results.append(zr)
 
-        r = requests.get(req_zuul)
-        zr["detail"] = json.loads(r.text)
+        for zr in zuul_results:
+            uuid = zr["url"].split("/")[-1]
+            req_zuul = "{}/api/tenant/openstack/builds?uuid={}".format(
+                ZUUL_BASE, uuid)
 
-    output(zuul_results, args.format)
+            r = requests.get(req_zuul)
+            zr["detail"] = json.loads(r.text)
+
+    results = []
+    if args.term is not None:
+        dterm = int(eval(args.term))
+        for zr in zuul_results:
+            dt = datetime.datetime.strptime(
+                    zr["detail"][0]["event_timestamp"], '%Y-%m-%dT%H:%M:%S')
+            ddelta = datetime.datetime.now() - datetime.timedelta(hours=dterm)
+            if dt > ddelta:
+                results.append(zr)
+    else:
+        results = zuul_results
+
+    output(results, args.format)
 
 if __name__ == '__main__':
     main()
