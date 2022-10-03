@@ -57,14 +57,14 @@ def change_messages(chid):
     return obj
 
 
-def html(json_obj):
+def to_html(json_obj):
     def make_header(hlist):
         tmp = ""
         for h in hlist:
             tmp = tmp + "<th>" + h + "</th>"
         return "<thead><tr>{}</tr></thead>".format(tmp)
 
-    hlist = ["No.", "Gerrit URL", "Test Name", "Test Result", 
+    hlist = ["No.", "Gerrit URL", "Patchset", "Test Name", "Test Result",
             "Start", "End", "Time", "All logs", "Artifacts"]
 
     html = ""
@@ -79,6 +79,7 @@ def html(json_obj):
         line_html = "<tr>"
         line_html = line_html + "<td>{num}</td>"
         line_html = line_html + "<td><a href={g_url}>{g_url}</td>"
+        line_html = line_html + "<td>{ps}</td>"
         line_html = line_html + "<td>{name}</td>"
         line_html = line_html + "<td><a href={result}>result</td>"
         line_html = line_html + "<td>{t_start}</td>"
@@ -89,7 +90,7 @@ def html(json_obj):
         line_html = line_html + "</tr>"
 
         b = line_html.format(
-                num=cnt, g_url=jd["ref_url"], name=j["name"],
+                num=cnt, g_url=jd["ref_url"], ps=jd["patchset"], name=j["name"],
                 result=j["url"],
                 t_start=jd["start_time"], t_end=jd["end_time"],
                 time=j["time"],
@@ -108,7 +109,7 @@ def html(json_obj):
 
 def output(json_obj, format="html"):
     if format == "html":
-        html(json_obj)
+        to_html(json_obj)
     else:
         print(json.dumps(json_obj))
 
