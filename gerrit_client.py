@@ -64,7 +64,7 @@ def to_html(json_obj):
             tmp = tmp + "<th>" + h + "</th>"
         return "<thead><tr>{}</tr></thead>".format(tmp)
 
-    hlist = ["No.", "Gerrit URL", "Patchset", "Test Name", "Test Result",
+    hlist = ["No.", "Gerrit URL", "PS", "Test Name", "Job", "Testr",
             "Start", "End", "Time", "All logs", "Artifacts"]
 
     html = ""
@@ -80,19 +80,26 @@ def to_html(json_obj):
         line_html = line_html + "<td>{num}</td>"
         line_html = line_html + "<td><a href={g_url}>{g_url}</td>"
         line_html = line_html + "<td>{ps}</td>"
-        line_html = line_html + "<td>{name}</td>"
-        line_html = line_html + "<td><a href={result}>result</td>"
+        line_html = line_html + "<td><a href={result}>{name}</a></td>"
+        line_html = line_html + "<td><a href={job_output}>x</a></td>"
+        line_html = line_html + "<td><a href={testr_results}>x</a></td>"
         line_html = line_html + "<td>{t_start}</td>"
         line_html = line_html + "<td>{t_end}</td>"
         line_html = line_html + "<td>{time}</td>"
-        line_html = line_html + "<td><a href={logs}>logs</td>"
+        line_html = line_html + "<td><a href={logs}>x</td>"
         line_html = line_html + "<td><a href={art}>download</td>"
         line_html = line_html + "</tr>"
 
+        testr_results = "{}{}".format(jd["log_url"], "testr_results.html")
+        job_output = "{}{}".format(jd["log_url"], "job-output.txt")
+        t_start = jd["start_time"].replace("T", " ")
+        t_end = jd["end_time"].replace("T", " ")
+
         b = line_html.format(
-                num=cnt, g_url=jd["ref_url"], ps=jd["patchset"], name=j["name"],
-                result=j["url"],
-                t_start=jd["start_time"], t_end=jd["end_time"],
+                num=cnt, g_url=jd["ref_url"], ps=jd["patchset"],
+                name=j["name"], result=j["url"],
+                job_output=job_output, testr_results=testr_results,
+                t_start=t_start, t_end=t_end,
                 time=j["time"],
                 logs=jd["log_url"], art=jd["artifacts"][0]["url"])
 
@@ -100,16 +107,21 @@ def to_html(json_obj):
         cnt += 1
 
 
+    styles = ["table,th,tr,td {border: 1px solid; text-align: center;}"]
     thead = make_header(hlist)
-
     tbody = "<tbody>{}</tbody>".format(bs)
-    html = "<html><table border=1>{}{}</table></html>".format(thead, tbody)
-    print(html)
+
+    body = "<body><table>{}{}</table></body>".format(
+            thead, tbody)
+    head = "<head>{style}</head>".format(
+            style="<style>{}</style>".format(' '.join(styles)))
+    html = "<html>{}{}</html>".format(head, body)
+    return html
 
 
 def output(json_obj, format="html"):
     if format == "html":
-        to_html(json_obj)
+        print(to_html(json_obj))
     else:
         print(json.dumps(json_obj))
 
