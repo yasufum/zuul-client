@@ -19,7 +19,7 @@ FORMATS = ["json", "html"]
 TARGET_STATUS = "FAILURE"
 
 HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Job", "Testr",
-        "Start", "End", "Time", "All logs", "Artifacts"]
+        "Start", "End", "Time", "All Logs", "Artifacts"]
 
 # Included in JSON response to guard from a bot. It should be removed from by
 # API consumer him/herself.
