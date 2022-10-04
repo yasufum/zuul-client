@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import csv
 import datetime
 import json
 import re
@@ -15,6 +16,9 @@ FORMATS = ["json", "html"]
 
 # Status of test result for querying.
 TARGET_STATUS = "FAILURE"
+
+HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Job", "Testr",
+        "Start", "End", "Time", "All logs", "Artifacts"]
 
 # Included in JSON response to guard from a bot. It should be removed from by
 # API consumer him/herself.
@@ -57,15 +61,44 @@ def change_messages(chid):
     return obj
 
 
+def to_csv(json_obj, output="example.csv", title=False):
+
+    hlist = HEADER_LIST.copy()
+    hlist.insert(4, "Zuul Link")
+
+    contents = []
+    contents.append(hlist)
+    cnt = 1
+    for j in json_obj:
+        jd = j["detail"][0]
+
+        job_output = "{}{}".format(jd["log_url"], "job-output.txt")
+        testr_results = "{}{}".format(jd["log_url"], "testr_results.html")
+        t_start = jd["start_time"].replace("T", " ")
+        t_end = jd["end_time"].replace("T", " ")
+        contents.append([
+            cnt, jd["ref_url"], jd["patchset"],
+            j["name"], j["url"],
+            job_output, testr_results,
+            t_start, t_end,
+            j["time"],
+            jd["log_url"], jd["artifacts"][0]["url"]
+            ])
+        cnt += 1
+    with open(output, "w") as f:
+        writer = csv.writer(f)
+        writer.writerows(contents)
+
+
 def to_html(json_obj):
+    """Generate simple html from zuul_result obj"""
+
     def make_header(hlist):
+
         tmp = ""
         for h in hlist:
             tmp = tmp + "<th>" + h + "</th>"
         return "<thead><tr>{}</tr></thead>".format(tmp)
-
-    hlist = ["No.", "Gerrit URL", "PS", "Test Name", "Job", "Testr",
-            "Start", "End", "Time", "All logs", "Artifacts"]
 
     html = ""
 
@@ -106,22 +139,27 @@ def to_html(json_obj):
         bs = "{}{}".format(bs, b)
         cnt += 1
 
-
-    styles = ["table,th,tr,td {border: 1px solid; text-align: center;}"]
-    thead = make_header(hlist)
+    styles = ["table,th,tr,td {border: 1px solid; text-align: center;}",
+            ".title {font-size: 2em;}"]
+    thead = make_header(HEADER_LIST)
     tbody = "<tbody>{}</tbody>".format(bs)
 
-    body = "<body><table>{}{}</table></body>".format(
-            thead, tbody)
+    page_title = "<div class='title'>{msg}</div>".format(
+            msg="Zuul test results")
+    table = "<div><table>{h}{b}</table></div>".format(h=thead, b=tbody)
+
+    body = "<body>{title}{table}</body>".format(title=page_title, table=table)
     head = "<head>{style}</head>".format(
             style="<style>{}</style>".format(' '.join(styles)))
-    html = "<html>{}{}</html>".format(head, body)
+    html = "<html>{h}{b}</html>".format(h=head, b=body)
     return html
 
 
 def output(json_obj, format="html"):
     if format == "html":
         print(to_html(json_obj))
+    elif format == "csv":
+        to_csv(json_obj, "example.csv")
     else:
         print(json.dumps(json_obj))
 
