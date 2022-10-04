@@ -4,6 +4,7 @@ import argparse
 import csv
 import datetime
 import json
+import os
 import re
 import requests
 from urllib.parse import quote
@@ -38,16 +39,17 @@ def parse_args():
     parser = argparse.ArgumentParser(description="")
 
     parser.add_argument("-f", "--format", type=str,
-            default="json",
             help="Output format")
     parser.add_argument("--change-ids", type=str, nargs="+",
             help="List of change IDs")
     parser.add_argument("-i", "--change-ids-file", type=str,
             help="Input file include a list of change IDs")
-    parser.add_argument("--input-json", type=str,
-            help="Path of JSON formatted results, for debugging.")
+    parser.add_argument("-o", "--output-file", type=str,
+            help="Path of output file.")
     parser.add_argument("-t", "--term", type=str,
             help="Term for querying (in hours, such as '24*2' for two days).")
+    parser.add_argument("--input-json", type=str,
+            help="Path of JSON formatted results, for debugging.")
     return parser.parse_args()
 
 
@@ -155,13 +157,31 @@ def to_html(json_obj):
     return html
 
 
-def output(json_obj, format="html"):
+def output(json_obj, ofile=None, format="json"):
+    """Output results.
+
+    The results is given as JSON object of a list contains each entry.
+    """
+
     if format == "html":
-        print(to_html(json_obj))
+        if ofile is not None:
+            with open(ofile, "w") as f:
+                f.write(to_html(json_obj))
+        else:
+            print(to_html(json_obj))
+
     elif format == "csv":
-        to_csv(json_obj, "example.csv")
+        if ofile is not None:
+            fname = ofile
+        else:  # use default file name
+            fname = "example.csv"
+        to_csv(json_obj, fname)
     else:
-        print(json.dumps(json_obj))
+        if ofile is not None:
+            with open(ofile, "w") as f:
+                f.write(json.dumps(json_obj))
+        else:
+            print(json.dumps(json_obj))
 
 
 def main():
@@ -178,6 +198,17 @@ def main():
                 if not l.startswith("#"):
                     ch_ids.append(l.rstrip())
     ch_ids = list(set(ch_ids))
+
+    # Find format from output file.
+    ofile_ext = None
+    if args.output_file is not None:
+        ofile_ext = os.path.splitext(args.output_file)[-1]
+        ofile_ext = ofile_ext.replace(".", "")
+
+    # Overwrite output format if it's not specified explicitly, or do not
+    # anything on the other hand.
+    if (args.format is None) and (ofile_ext is not None):
+        args.format = ofile_ext
 
     zuul_results = []
     if args.input_json is not None:
@@ -205,7 +236,7 @@ def main():
             r = requests.get(req_zuul)
             zr["detail"] = json.loads(r.text)
 
-    results = []
+    filtered_results = []
     if args.term is not None:
         dterm = int(eval(args.term))
         for zr in zuul_results:
@@ -213,11 +244,11 @@ def main():
                     zr["detail"][0]["event_timestamp"], '%Y-%m-%dT%H:%M:%S')
             ddelta = datetime.datetime.now() - datetime.timedelta(hours=dterm)
             if dt > ddelta:
-                results.append(zr)
+                filtered_results.append(zr)
     else:
-        results = zuul_results
+        filtered_results = zuul_results
 
-    output(results, args.format)
+    output(filtered_results, args.output_file, args.format)
 
 if __name__ == '__main__':
     main()
