@@ -6,6 +6,7 @@ A util tool for collecting results of Openstack Zuul gate tests.
 
 Zuulからテスト結果を抽出、参照するための簡易ツールです。
 現在のところ、テスト結果がFAILUREとなったものだけを抽出します。
+またログファイルを取得するためのサポートツールも提供しています。
 
 複数の出力形式をサポートしており、例えばhtmlとして出力する場合は
 以下の様にします。
@@ -19,6 +20,17 @@ $ python3 zuul_client.py -o results.html --change-ids 859895
 ことがわかります。
 
 ![Zuul test results](doc/img/zuul_test_results.png "zuul test results")
+
+ログファイルの取得は以下のようにして行います。
+`DOWNLOAD_SCRIPT_URL`はZuulの`Artifacts`から参照できる
+`Download all logs`のリンク先のスクリプトのURLです。
+
+```sh
+$ bash get_logs.sh DOWNLOAD_SCRIPT_URL
+```
+
+この`get_logs.sh`はカレントディレクトリに`tmp`ディレクトリを作成し、その配下に
+ログファイルをダウンロードして格納します。
 
 ## 使い方
 
