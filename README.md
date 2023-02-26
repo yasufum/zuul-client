@@ -22,8 +22,20 @@ $ python3 zuul_client.py -o results.html --change-ids 859895
 ![Zuul test results](doc/img/zuul_test_results.png "zuul test results")
 
 ログファイルの取得は以下のようにして行います。
-`DOWNLOAD_SCRIPT_URL`はZuulの`Artifacts`から参照できる
-`Download all logs`のリンク先のスクリプトのURLです。
+`all_logs.py`は指定したchange IDのコミットの`FAILURE`となった全てのログを
+取得するためのツールです。
+通常はログが大量となるため、パッチセットを指定して次のように実行します。
+パッチセットを省略した場合は当該Change IDの全てのログを取得します。
+
+```sh
+$ python3 all_logs.py -i 859895 -p 3
+```
+
+この`all_logs.py`は内部で`get_logs.sh`というスクリプトを実行しており、
+これはZuulの`Artifacts`から参照できる
+`Download all logs`のリンク先にあるダウンロードスクリプトを実行するための
+簡易スクリプトで、これを直接実行して目的のログを取得することもできます。
+`DOWNLOAD_SCRIPT_URL`がダウンロードスクリプトのURLになります。
 
 ```sh
 $ bash get_logs.sh DOWNLOAD_SCRIPT_URL
