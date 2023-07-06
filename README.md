@@ -22,14 +22,31 @@ $ python3 zuul_client.py -o results.html --change-ids 859895
 ![Zuul test results](doc/img/zuul_test_results.png "zuul test results")
 
 ログファイルの取得は以下のようにして行います。
-`all_logs.py`は指定したchange IDのコミットの`FAILURE`となった全てのログを
+`all_logs.py`は指定したchange IDのコミットの全てのログを
 取得するためのツールです。
+デフォルトではテスト結果が`FAILURE`となったログのみです。
 通常はログが大量となるため、パッチセットを指定して次のように実行します。
 パッチセットを省略した場合は当該Change IDの全てのログを取得します。
 
 ```sh
 $ python3 all_logs.py -i 859895 -p 3
 ```
+
+また任意のジョブ名やテスト結果を指定することも出来ます。
+例えば`openstack-tox-py310`というジョブ名のログを取得するには
+
+```sh
+$ python3 all_logs.py -i 859895 -p 3 -j openstack-tox-py310
+```
+
+とします。またテスト結果が`FAILURE`ではなく`SUCESS`のログを取得するには
+
+```sh
+$ python3 all_logs.py -i 859895 -p 3 -r SUCESS
+```
+
+とします。ジョブ名とテスト結果の指定は排他的であり、ジョブ名を指定した場合は
+テスト結果は無視されます。
 
 この`all_logs.py`は内部で`get_logs.sh`というスクリプトを実行しており、
 これはZuulの`Artifacts`から参照できる

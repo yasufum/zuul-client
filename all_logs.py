@@ -5,6 +5,10 @@ import json
 import subprocess
 import sys
 
+
+TEST_RESULTS = ["SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="")
 
@@ -12,6 +16,12 @@ def parse_args():
             help="Change ID")
     parser.add_argument("-p", "--patchset", type=int,
             help="Patch set")
+    parser.add_argument("-j", "--job-name", type=str,
+            help="Job name for filtering for retrieving logs.")
+    parser.add_argument("-r", "--test-results", type=str, nargs="+",
+            default="FAILURE",
+            help="List of test result for filtering for retrieving logs "
+                        "({}).".format(', '.join(TEST_RESULTS)))
     return parser.parse_args()
 
 # CHANGE_ID=$1
@@ -20,11 +30,24 @@ def parse_args():
 #     jq -r .[].detail[].artifacts[].url |\
 #     xargs bash get_logs.sh
 
+
+def _zuul_client_script():
+    return "zuul_client.py"
+
+
 def main():
     args = parse_args()
 
-    cmd = ["python3", "zuul_client.py", "--change-ids", args.change_id]
-    #cmd = ["python3", "zuul_client.py", "--input-json", "872690.json"]
+    cmd = ["python3", _zuul_client_script(), "--change-ids", args.change_id]
+
+    if args.test_results is not None:
+        for x in ["--test-results", " ".join(args.test_results)]:
+            cmd.append(x)
+
+    if args.job_name is not None:
+        for x in ["--job-name", args.job_name]:
+            cmd.append(x)
+
     res = subprocess.run(cmd, encoding='utf-8', stdout=subprocess.PIPE)
 
     dl_urls = []

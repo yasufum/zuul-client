@@ -16,7 +16,8 @@ ZUUL_BASE = "https://zuul.opendev.org"
 FORMATS = ["json", "html"]
 
 # Status of test result for querying.
-TARGET_STATUS = "FAILURE"
+TEST_RESULTS = ["SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"]
+
 
 HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Job", "Testr",
         "Start", "End", "Time", "All Logs", "Artifacts"]
@@ -46,6 +47,12 @@ def parse_args():
             help="Input file include a list of change IDs")
     parser.add_argument("-o", "--output-file", type=str,
             help="Path of output file.")
+    parser.add_argument("-j", "--job-name", type=str,
+            help="Job name for filtering for retrieving logs.")
+    parser.add_argument("-r", "--test-results", type=str, nargs="+",
+            default="FAILURE",
+            help="List of test result for filtering for retrieving logs "
+                        "({}).".format(', '.join(TEST_RESULTS)))
     parser.add_argument("-t", "--term", type=str,
             help="Term for querying (in hours, such as '24*2' for two days).")
     parser.add_argument("--input-json", type=str,
@@ -184,6 +191,40 @@ def output(json_obj, ofile=None, format="json"):
             print(json.dumps(json_obj))
 
 
+def _get_zuul_results(ch_ids, test_results, job_name):
+    """Get a list of job results matched with given conditions.
+    
+    The given conditions are evaluated from job_name first, then test_results.
+    If job_name is not None, the next check for test_results will be skipped.
+    For example, if no job_name and a test_results ['SUCCESS'] are given, it
+    returns all results matched with SUCCESS.
+    """
+
+    zuul_results = []
+    ptns = []
+    if job_name is not None:
+        ptns.append(re.compile(r'^- ({}) (.*) : .* in (.*)$'.format(job_name)))
+    else:
+        for ts in test_results:
+            ptns.append(
+                re.compile(r'^- (.*) (.*) : {} in (.*)$'.format(ts)))
+
+    for ptn in ptns:
+        for chid in ch_ids:
+            msg_objs = change_messages(chid)
+            for obj in msg_objs:
+                for m in obj["message"].split("\n"):
+                    matched = ptn.match(m)
+                    if matched is not None:
+                        name = matched.group(1)
+                        url = matched.group(2)
+                        time = matched.group(3).replace(" (non-voting)", "")
+                        zr = {"name": name, "url": url, "time": time}
+                        zuul_results.append(zr)
+
+    return zuul_results
+
+
 def main():
     args = parse_args()
 
@@ -210,23 +251,10 @@ def main():
     if (args.format is None) and (ofile_ext is not None):
         args.format = ofile_ext
 
-    zuul_results = []
     if args.input_json is not None:
         zuul_results = json.load(open(args.input_json))
     else:
-        ptn = re.compile(r'^- (.*) (.*) : {} in (.*)$'.format(TARGET_STATUS))
-
-        for chid in ch_ids:
-            msg_objs = change_messages(chid)
-            for obj in msg_objs:
-                for m in obj["message"].split("\n"):
-                    matched = ptn.match(m)
-                    if matched is not None:
-                        name = matched.group(1)
-                        url = matched.group(2)
-                        time = matched.group(3).replace(" (non-voting)", "")
-                        zr = {"name": name, "url": url, "time": time}
-                        zuul_results.append(zr)
+        zuul_results = _get_zuul_results(ch_ids, args.test_results, args.job_name)
 
         for zr in zuul_results:
             uuid = zr["url"].split("/")[-1]
@@ -236,7 +264,7 @@ def main():
             r = requests.get(req_zuul)
             zr["detail"] = json.loads(r.text)
 
-    filtered_results = []
+    filtered_results = []  # filter with term
     if args.term is not None:
         dterm = int(eval(args.term))
         for zr in zuul_results:
