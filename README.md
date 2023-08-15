@@ -4,12 +4,10 @@ A util tool for collecting results of Openstack Zuul gate tests.
 
 ## これは何
 
-Zuulからテスト結果を抽出、参照するための簡易ツールです。
-現在のところ、テスト結果がFAILUREとなったものだけを抽出します。
-またログファイルを取得するためのサポートツールも提供しています。
+OpenStack Zuulからテストに失敗した結果を取得、参照するための簡易ツールです
+（テスト結果のステータスが`SUCCESS`以外のものを取得します）。
 
-複数の出力形式をサポートしており、例えばhtmlとして出力する場合は
-以下の様にします。
+例えばテスト結果の一覧をhtmlとして取得する場合は以下の様にします。
 
 ```sh
 $ python3 zuul_client.py -o results.html --change-ids 859895
@@ -39,13 +37,13 @@ $ python3 all_logs.py -i 859895 -p 3
 $ python3 all_logs.py -i 859895 -p 3 -j openstack-tox-py310
 ```
 
-とします。またテスト結果が`FAILURE`ではなく`SUCESS`のログを取得するには
+とします。また対象とするテスト結果を指定する場合には
 
 ```sh
 $ python3 all_logs.py -i 859895 -p 3 -r SUCESS
 ```
 
-とします。ジョブ名とテスト結果の指定は排他的であり、ジョブ名を指定した場合は
+のように`-r`にて指定します。ジョブ名とテスト結果の指定は排他的であり、ジョブ名を指定した場合は
 テスト結果は無視されます。
 
 この`all_logs.py`は内部で`get_logs.sh`というスクリプトを実行しており、

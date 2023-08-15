@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 
-TEST_RESULTS = ["SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"]
+TEST_RESULTS = {"SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"}
 
 
 def parse_args():
@@ -19,13 +19,13 @@ def parse_args():
     parser.add_argument("-j", "--job-name", type=str,
             help="Job name for filtering for retrieving logs.")
     parser.add_argument("-r", "--test-results", type=str, nargs="+",
-            default="FAILURE",
-            help="List of test result for filtering for retrieving logs "
-                        "({}).".format(', '.join(TEST_RESULTS)))
+            help=("List of terms of test result ({}) for filtering. "
+                  "If this option is not specified, get all logs other "
+                  "than SUCCESS.").format(', '.join(TEST_RESULTS)))
     return parser.parse_args()
 
 # CHANGE_ID=$1
-# 
+#
 # python3 zuul_client.py --change-ids ${CHANGE_ID} |\
 #     jq -r .[].detail[].artifacts[].url |\
 #     xargs bash get_logs.sh
@@ -41,13 +41,18 @@ def main():
     cmd = ["python3", _zuul_client_script(), "--change-ids", args.change_id]
 
     if args.test_results is not None:
-        for x in ["--test-results", " ".join(args.test_results)]:
-            cmd.append(x)
+        my_results = set(args.test_results)
+    else:
+        my_results = TEST_RESULTS - {"SUCCESS"}
+
+    for x in ["--test-results", " ".join(my_results)]:
+        cmd.append(x)
 
     if args.job_name is not None:
         for x in ["--job-name", args.job_name]:
             cmd.append(x)
 
+    print(cmd)
     res = subprocess.run(cmd, encoding='utf-8', stdout=subprocess.PIPE)
 
     dl_urls = []
@@ -68,6 +73,7 @@ def main():
     for u in dl_urls:
         cmd = ["bash", "get_logs.sh", u]
         res = subprocess.run(cmd)
+
 
 if __name__ == '__main__':
     main()

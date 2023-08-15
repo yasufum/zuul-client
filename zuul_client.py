@@ -16,7 +16,7 @@ ZUUL_BASE = "https://zuul.opendev.org"
 FORMATS = ["json", "html"]
 
 # Status of test result for querying.
-TEST_RESULTS = ["SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"]
+TEST_RESULTS = {"SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"}
 
 
 HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Job", "Testr",
@@ -50,9 +50,9 @@ def parse_args():
     parser.add_argument("-j", "--job-name", type=str,
             help="Job name for filtering for retrieving logs.")
     parser.add_argument("-r", "--test-results", type=str, nargs="+",
-            default="FAILURE",
-            help="List of test result for filtering for retrieving logs "
-                        "({}).".format(', '.join(TEST_RESULTS)))
+            help=("List of terms of test result ({}) for filtering. "
+                  "If this option is not specified, get all logs other "
+                  "than SUCCESS.").format(', '.join(TEST_RESULTS)))
     parser.add_argument("-t", "--term", type=str,
             help="Term for querying (in hours, such as '24*2' for two days).")
     parser.add_argument("--input-json", type=str,
@@ -205,6 +205,10 @@ def _get_zuul_results(ch_ids, test_results, job_name):
     if job_name is not None:
         ptns.append(re.compile(r'^- ({}) (.*) : .* in (.*)$'.format(job_name)))
     else:
+        if test_results is not None:
+            test_results = set(test_results)
+        else:
+            test_results = TEST_RESULTS - {"SUCCESS"}
         for ts in test_results:
             ptns.append(
                 re.compile(r'^- (.*) (.*) : {} in (.*)$'.format(ts)))
