@@ -7,13 +7,14 @@ import json
 import os
 import re
 import requests
+import sys
 from urllib.parse import quote
 
 BASE_URL = "https://review.opendev.org"
 ZUUL_BASE = "https://zuul.opendev.org"
 
 # Supported output format.
-FORMATS = ["json", "html"]
+FORMATS = {"json", "csv", "html"}
 
 # Status of test result for querying.
 TEST_RESULTS = {"SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"}
@@ -40,7 +41,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="")
 
     parser.add_argument("-f", "--format", type=str,
-            help="Output format")
+            help="Output format ({}).".format(', '.join(FORMATS)))
     parser.add_argument("--change-ids", type=str, nargs="+",
             help="List of change IDs")
     parser.add_argument("-i", "--change-ids-file", type=str,
@@ -70,7 +71,7 @@ def change_messages(chid):
     return obj
 
 
-def to_csv(json_obj, output="example.csv", title=False):
+def to_csv(json_obj, ofile=None):
 
     hlist = HEADER_LIST.copy()
     hlist.insert(4, "Zuul Link")
@@ -94,9 +95,14 @@ def to_csv(json_obj, output="example.csv", title=False):
             jd["log_url"], jd["artifacts"][0]["url"]
             ])
         cnt += 1
-    with open(output, "w") as f:
-        writer = csv.writer(f)
+    if ofile is not None:
+        with open(ofile, "w") as f:
+            writer = csv.writer(f)
+            writer.writerows(contents)
+    else:
+        writer = csv.writer(sys.stdout)
         writer.writerows(contents)
+
 
 
 def to_html(json_obj):
@@ -178,11 +184,7 @@ def output(json_obj, ofile=None, format="json"):
             print(to_html(json_obj))
 
     elif format == "csv":
-        if ofile is not None:
-            fname = ofile
-        else:  # use default file name
-            fname = "example.csv"
-        to_csv(json_obj, fname)
+        to_csv(json_obj, ofile)
     else:
         if ofile is not None:
             with open(ofile, "w") as f:
