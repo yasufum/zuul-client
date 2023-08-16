@@ -28,24 +28,13 @@ HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Job", "Testr",
 MAGIC_STR = ")]}'\n"
 
 
-# Use full change-id because a backport patch can have the same one as master.
-def gerrit_change_id(ch_id, proj="openstack/tacker", branch="master"):
-    if ch_id.startswith("I"):
-        ch_id = "{}~{}~{}".format(proj, branch, ch_id)
-    else:
-        ch_id = ch_id
-    return quote(ch_id, safe='')
-
-
-def parse_args():
+def _parse_args():
     parser = argparse.ArgumentParser(description="")
 
     parser.add_argument("-f", "--format", type=str,
             help="Output format ({}).".format(', '.join(FORMATS)))
-    parser.add_argument("--change-ids", type=str, nargs="+",
+    parser.add_argument("-i", "--change-ids", type=str, nargs="+",
             help="List of change IDs")
-    parser.add_argument("-i", "--change-ids-file", type=str,
-            help="Input file include a list of change IDs")
     parser.add_argument("-o", "--output-file", type=str,
             help="Path of output file.")
     parser.add_argument("-j", "--job-name", type=str,
@@ -61,7 +50,16 @@ def parse_args():
     return parser.parse_args()
 
 
-def change_messages(chid):
+def _change_messages(chid):
+
+    # Use full change-id because a backport patch can have the same one as master.
+    def gerrit_change_id(ch_id, proj="openstack/tacker", branch="master"):
+        if ch_id.startswith("I"):
+            ch_id = "{}~{}~{}".format(proj, branch, ch_id)
+        else:
+            ch_id = ch_id
+        return quote(ch_id, safe='')
+
     req_gerrit = "{}/changes/{}/messages/".format(
             BASE_URL, gerrit_change_id(chid))
     r = requests.get(req_gerrit)
@@ -71,7 +69,7 @@ def change_messages(chid):
     return obj
 
 
-def to_csv(json_obj, ofile=None):
+def _to_csv(json_obj, ofile=None):
 
     hlist = HEADER_LIST.copy()
     hlist.insert(4, "Zuul Link")
@@ -105,7 +103,7 @@ def to_csv(json_obj, ofile=None):
 
 
 
-def to_html(json_obj):
+def _to_html(json_obj):
     """Generate simple html from zuul_result obj"""
 
     def make_header(hlist):
@@ -170,7 +168,7 @@ def to_html(json_obj):
     return html
 
 
-def output(json_obj, ofile=None, format="json"):
+def _output_to_file(json_obj, ofile=None, format="json"):
     """Output results.
 
     The results is given as JSON object of a list contains each entry.
@@ -179,12 +177,12 @@ def output(json_obj, ofile=None, format="json"):
     if format == "html":
         if ofile is not None:
             with open(ofile, "w") as f:
-                f.write(to_html(json_obj))
+                f.write(_to_html(json_obj))
         else:
-            print(to_html(json_obj))
+            print(_to_html(json_obj))
 
     elif format == "csv":
-        to_csv(json_obj, ofile)
+        _to_csv(json_obj, ofile)
     else:
         if ofile is not None:
             with open(ofile, "w") as f:
@@ -217,7 +215,7 @@ def _get_zuul_results(ch_ids, test_results, job_name):
 
     for ptn in ptns:
         for chid in ch_ids:
-            msg_objs = change_messages(chid)
+            msg_objs = _change_messages(chid)
             for obj in msg_objs:
                 for m in obj["message"].split("\n"):
                     matched = ptn.match(m)
@@ -231,20 +229,32 @@ def _get_zuul_results(ch_ids, test_results, job_name):
     return zuul_results
 
 
-def main():
-    args = parse_args()
+def _setup_ch_ids(ch_ids):
 
-    ch_ids = []
-
-    if args.change_ids is not None:
-        ch_ids = args.change_ids
-
-    if args.change_ids_file is not None:
-        with open(args.change_ids_file) as f:
+    def _parse_change_ids_file(fname):
+        ch_ids = []
+        with open(fname) as f:
             for l in f.readlines():
                 if not l.startswith("#"):
                     ch_ids.append(l.rstrip())
-    ch_ids = list(set(ch_ids))
+        return list(set(ch_ids))
+
+    ch_files = []
+    ids = []
+    for i in ch_ids:
+        if os.path.isfile(i):
+            ch_files.append(i)
+            ids = ids + _parse_change_ids_file(i)
+    return list(set(ids + ch_ids) - set(ch_files))
+
+
+def main():
+    args = _parse_args()
+
+    ch_ids = []
+    if args.change_ids is not None:
+        ch_ids = list(set(args.change_ids))
+    ch_ids = _setup_ch_ids(ch_ids)
 
     # Find format from output file.
     ofile_ext = None
@@ -282,7 +292,7 @@ def main():
     else:
         filtered_results = zuul_results
 
-    output(filtered_results, args.output_file, args.format)
+    _output_to_file(filtered_results, args.output_file, args.format)
 
 if __name__ == '__main__':
     main()
