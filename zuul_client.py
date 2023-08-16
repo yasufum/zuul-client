@@ -4,11 +4,15 @@ import argparse
 import csv
 import datetime
 import json
+import logging
 import os
 import re
 import requests
 import sys
 from urllib.parse import quote
+
+os.makedirs("log", exist_ok=True)
+logging.basicConfig(filename="logs/zuul_client.log", level=logging.DEBUG)
 
 BASE_URL = "https://review.opendev.org"
 ZUUL_BASE = "https://zuul.opendev.org"
@@ -178,17 +182,22 @@ def _output_to_file(json_obj, ofile=None, format="json"):
         if ofile is not None:
             with open(ofile, "w") as f:
                 f.write(_to_html(json_obj))
+            logging.info("The result exported as '{}'.".format(ofile))
         else:
             print(_to_html(json_obj))
+            logging.info("The result of html exported to stdout.")
 
     elif format == "csv":
         _to_csv(json_obj, ofile)
+        logging.info("The result of CSV exported to stdout.")
     else:
         if ofile is not None:
             with open(ofile, "w") as f:
                 f.write(json.dumps(json_obj))
+            logging.info("The result exported as '{}'.".format(ofile))
         else:
             print(json.dumps(json_obj))
+            logging.info("The result of json exported to stdout.")
 
 
 def _get_zuul_results(ch_ids, test_results, job_name):
@@ -209,6 +218,7 @@ def _get_zuul_results(ch_ids, test_results, job_name):
             test_results = set(test_results)
         else:
             test_results = TEST_RESULTS - {"SUCCESS"}
+
         for ts in test_results:
             ptns.append(
                 re.compile(r'^- (.*) (.*) : {} in (.*)$'.format(ts)))
@@ -255,6 +265,7 @@ def main():
     if args.change_ids is not None:
         ch_ids = list(set(args.change_ids))
     ch_ids = _setup_ch_ids(ch_ids)
+    logging.info("Change IDs for getting logs, {}.".format(ch_ids))
 
     # Find format from output file.
     ofile_ext = None
@@ -269,6 +280,7 @@ def main():
 
     if args.input_json is not None:
         zuul_results = json.load(open(args.input_json))
+        logging.info("Json input {} is specified.".format(args.input_json))
     else:
         zuul_results = _get_zuul_results(ch_ids, args.test_results, args.job_name)
 
@@ -279,6 +291,7 @@ def main():
 
             r = requests.get(req_zuul)
             zr["detail"] = json.loads(r.text)
+        logging.info("All results metadata from zuul has been retrieved successfully.")
 
     filtered_results = []  # filter with term
     if args.term is not None:

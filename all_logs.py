@@ -2,11 +2,16 @@
 
 import argparse
 import json
+import logging
+import os
 import subprocess
 import sys
 
+os.makedirs("log", exist_ok=True)
+logging.basicConfig(filename="logs/all_logs.log", level=logging.DEBUG)
 
 TEST_RESULTS = {"SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"}
+ZUUL_CLIENT_SCRIPT = "zuul_client.py"
 
 
 def parse_args():
@@ -24,51 +29,63 @@ def parse_args():
                   "than SUCCESS.").format(', '.join(TEST_RESULTS)))
     return parser.parse_args()
 
-# CHANGE_ID=$1
-#
-# python3 zuul_client.py --change-ids ${CHANGE_ID} |\
-#     jq -r .[].detail[].artifacts[].url |\
-#     xargs bash get_logs.sh
-
-
-def _zuul_client_script():
-    return "zuul_client.py"
-
 
 def main():
     args = parse_args()
 
-    cmd = ["python3", _zuul_client_script(), "--change-ids", args.change_id]
+    cmd = ["python3", ZUUL_CLIENT_SCRIPT, "--change-ids", args.change_id]
 
     if args.test_results is not None:
         my_results = set(args.test_results)
     else:
         my_results = TEST_RESULTS - {"SUCCESS"}
 
-    for x in ["--test-results", " ".join(my_results)]:
+    for x in ["--test-results"] + list(my_results):
         cmd.append(x)
 
     if args.job_name is not None:
         for x in ["--job-name", args.job_name]:
             cmd.append(x)
 
-    print(cmd)
+    logging.info("Run ZUUL_CLIENT_SCRIPT '{}'".format(cmd))
+
+    # Get the result from stdout as json.
     res = subprocess.run(cmd, encoding='utf-8', stdout=subprocess.PIPE)
+
+    def _latest_ps(json_obj):
+        """Retrieve the latest num of patchset
+
+        If target patchset is not given with option, the latest patchset is
+        used instead.
+        """
+        psets = []
+        for j in json_obj:
+            ps = j["detail"][0].get("patchset")
+            if ps is not None:
+                psets.append(ps)
+        psets.sort()
+        return int(psets[-1])
 
     dl_urls = []
     try:
         obj = json.loads(res.stdout)
+        # Matched entries with the target patchset are only picked up.
+        if args.patchset is not None:
+            ps = args.patchset
+        else:
+            ps = _latest_ps(obj)
         for j in obj:
             u = j["detail"][0]["artifacts"][0]["url"]
             if u is not None:
-                if (args.patchset == int(j["detail"][0].get("patchset")) or
-                    args.patchset is None):
+                if (ps == int(j["detail"][0].get("patchset"))):
                     dl_urls.append(u)
     except Exception as e:
         raise e
 
     if len(dl_urls) == 0:
-        sys.exit(f"No logs for change ID {args.change_id} ps {args.patchset}")
+        sys.exit(f"No logs for change ID {args.change_id},  patchset {ps}")
+
+    logging.info("{} entries matched.".format(len(dl_urls)))
 
     for u in dl_urls:
         cmd = ["bash", "get_logs.sh", u]
