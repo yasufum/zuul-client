@@ -5,14 +5,16 @@ import csv
 import datetime
 import json
 import logging
+from my_common import LOGDIR, TEST_RESULTS
 import os
 import re
 import requests
 import sys
 from urllib.parse import quote
 
-os.makedirs("log", exist_ok=True)
-logging.basicConfig(filename="logs/zuul_client.log", level=logging.DEBUG)
+os.makedirs(LOGDIR, exist_ok=True)
+LOGFILE = "{}/{}.log".format(LOGDIR, os.path.splitext(__file__)[0])
+logging.basicConfig(filename=LOGFILE, level=logging.DEBUG)
 
 BASE_URL = "https://review.opendev.org"
 ZUUL_BASE = "https://zuul.opendev.org"
@@ -20,12 +22,9 @@ ZUUL_BASE = "https://zuul.opendev.org"
 # Supported output format.
 FORMATS = {"json", "csv", "html"}
 
-# Status of test result for querying.
-TEST_RESULTS = {"SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"}
-
-
-HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Job", "Testr",
-        "Start", "End", "Time", "All Logs", "Artifacts"]
+HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Result", "Job",
+#HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Job",
+               "Testr", "Start", "End", "Time", "All Logs", "Artifacts"]
 
 # Included in JSON response to guard from a bot. It should be removed from by
 # API consumer him/herself.
@@ -76,7 +75,7 @@ def _change_messages(chid):
 def _to_csv(json_obj, ofile=None):
 
     hlist = HEADER_LIST.copy()
-    hlist.insert(4, "Zuul Link")
+    hlist.insert(5, "Zuul Link")
 
     contents = []
     contents.append(hlist)
@@ -90,7 +89,7 @@ def _to_csv(json_obj, ofile=None):
         t_end = jd["end_time"].replace("T", " ")
         contents.append([
             cnt, jd["ref_url"], jd["patchset"],
-            j["name"], j["url"],
+            j["name"], jd["result"], j["url"],
             job_output, testr_results,
             t_start, t_end,
             j["time"],
@@ -130,7 +129,8 @@ def _to_html(json_obj):
         line_html = line_html + "<td>{num}</td>"
         line_html = line_html + "<td><a href={g_url}>{g_url}</td>"
         line_html = line_html + "<td>{ps}</td>"
-        line_html = line_html + "<td><a href={result}>{name}</a></td>"
+        line_html = line_html + "<td><a href={result_url}>{name}</a></td>"
+        line_html = line_html + "<td>{result}</td>"
         line_html = line_html + "<td><a href={job_output}>x</a></td>"
         line_html = line_html + "<td><a href={testr_results}>x</a></td>"
         line_html = line_html + "<td>{t_start}</td>"
@@ -147,7 +147,7 @@ def _to_html(json_obj):
 
         b = line_html.format(
                 num=cnt, g_url=jd["ref_url"], ps=jd["patchset"],
-                name=j["name"], result=j["url"],
+                name=j["name"], result=jd["result"], result_url=j["url"],
                 job_output=job_output, testr_results=testr_results,
                 t_start=t_start, t_end=t_end,
                 time=j["time"],

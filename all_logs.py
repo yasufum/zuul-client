@@ -3,14 +3,17 @@
 import argparse
 import json
 import logging
+from my_common import LOGDIR, TEST_RESULTS
 import os
 import subprocess
 import sys
 
-os.makedirs("log", exist_ok=True)
-logging.basicConfig(filename="logs/all_logs.log", level=logging.DEBUG)
 
-TEST_RESULTS = {"SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"}
+os.makedirs(LOGDIR, exist_ok=True)
+LOGFILE = "{}/{}.log".format(LOGDIR, os.path.splitext(__file__)[0])
+logging.basicConfig(filename=LOGFILE, level=logging.DEBUG)
+
+#TEST_RESULTS = {"SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"}
 ZUUL_CLIENT_SCRIPT = "zuul_client.py"
 
 
