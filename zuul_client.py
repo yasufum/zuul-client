@@ -23,7 +23,6 @@ ZUUL_BASE = "https://zuul.opendev.org"
 FORMATS = {"json", "csv", "html"}
 
 HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Result", "Job",
-#HEADER_LIST = ["No.", "Gerrit URL", "PS", "Test Name", "Job",
                "Testr", "Start", "End", "Time", "All Logs", "Artifacts"]
 
 # Included in JSON response to guard from a bot. It should be removed from by
@@ -45,7 +44,8 @@ def _parse_args():
     parser.add_argument("-r", "--test-results", type=str, nargs="+",
             help=("List of terms of test result ({}) for filtering. "
                   "If this option is not specified, get all logs other "
-                  "than SUCCESS.").format(', '.join(TEST_RESULTS)))
+                  "than SUCCESS, or download all if ALL is specified."
+                  ).format(', '.join(TEST_RESULTS)))
     parser.add_argument("-t", "--term", type=str,
             help="Term for querying (in hours, such as '24*2' for two days).")
     parser.add_argument("--input-json", type=str,
@@ -214,10 +214,15 @@ def _get_zuul_results(ch_ids, test_results, job_name):
     if job_name is not None:
         ptns.append(re.compile(r'^- ({}) (.*) : .* in (.*)$'.format(job_name)))
     else:
+        logging.info("test_result is {}".format(test_results))
         if test_results is not None:
-            test_results = set(test_results)
+            if test_results == ['ALL']:
+                test_results = TEST_RESULTS
+            else:
+                test_results = set(test_results)
         else:
             test_results = TEST_RESULTS - {"SUCCESS"}
+        logging.info("post test_result is {}".format(test_results))
 
         for ts in test_results:
             ptns.append(

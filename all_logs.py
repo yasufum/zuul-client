@@ -13,7 +13,6 @@ os.makedirs(LOGDIR, exist_ok=True)
 LOGFILE = "{}/{}.log".format(LOGDIR, os.path.splitext(__file__)[0])
 logging.basicConfig(filename=LOGFILE, level=logging.DEBUG)
 
-#TEST_RESULTS = {"SUCCESS", "FAILURE", "RETRY_LIMIT", "POST_FAILURE"}
 ZUUL_CLIENT_SCRIPT = "zuul_client.py"
 
 
@@ -29,7 +28,8 @@ def parse_args():
     parser.add_argument("-r", "--test-results", type=str, nargs="+",
             help=("List of terms of test result ({}) for filtering. "
                   "If this option is not specified, get all logs other "
-                  "than SUCCESS.").format(', '.join(TEST_RESULTS)))
+                  "than SUCCESS, or download all if ALL is specified."
+                  ).format(', '.join(TEST_RESULTS)))
     return parser.parse_args()
 
 
@@ -40,6 +40,8 @@ def main():
 
     if args.test_results is not None:
         my_results = set(args.test_results)
+    elif args.test_results == "ALL":
+        my_results = TEST_RESULTS
     else:
         my_results = TEST_RESULTS - {"SUCCESS"}
 
