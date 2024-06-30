@@ -2,16 +2,13 @@
 
 import argparse
 import json
-import logging
-from my_common import LOGDIR, TEST_RESULTS
-import os
+from mylogging import TEST_RESULTS
+from mylogging import logger
 import subprocess
 import sys
 
 
-os.makedirs(LOGDIR, exist_ok=True)
-LOGFILE = "{}/{}.log".format(LOGDIR, os.path.splitext(__file__)[0])
-logging.basicConfig(filename=LOGFILE, level=logging.DEBUG)
+LOG = logger('all_logs')
 
 ZUUL_CLIENT_SCRIPT = "zuul_client.py"
 
@@ -52,7 +49,7 @@ def main():
         for x in ["--job-name", args.job_name]:
             cmd.append(x)
 
-    logging.info("Run ZUUL_CLIENT_SCRIPT '{}'".format(cmd))
+    LOG.info("Run ZUUL_CLIENT_SCRIPT '{}'".format(cmd))
 
     # Get the result from stdout as json.
     res = subprocess.run(cmd, encoding='utf-8', stdout=subprocess.PIPE)
@@ -73,6 +70,9 @@ def main():
 
     dl_urls = []
     try:
+        #j = res.stdout
+        #print(j)
+        #exit()
         obj = json.loads(res.stdout)
         # Matched entries with the target patchset are only picked up.
         if args.patchset is not None:
@@ -82,7 +82,7 @@ def main():
         for j in obj:
             u = j["detail"][0]["artifacts"][0]["url"]
             if u is not None:
-                if (ps == int(j["detail"][0].get("patchset"))):
+                if (ps == int(j["detail"][0]["ref"].get("patchset"))):
                     dl_urls.append(u)
     except Exception as e:
         raise e
@@ -90,7 +90,7 @@ def main():
     if len(dl_urls) == 0:
         sys.exit(f"No logs for change ID {args.change_id},  patchset {ps}")
 
-    logging.info("{} entries matched.".format(len(dl_urls)))
+    LOG.info("{} entries matched.".format(len(dl_urls)))
 
     for u in dl_urls:
         cmd = ["bash", "get_logs.sh", u]
